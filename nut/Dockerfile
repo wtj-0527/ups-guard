@@ -5,7 +5,7 @@ FROM alpine:3.21
 
 # 系统依赖安装（静态层，应该稳定命中缓存）
 RUN apk add --no-cache \
-        nut bash curl usbutils dos2unix libusb-dev eudev && \
+        nut python3 bash curl usbutils dos2unix libusb-dev eudev && \
     # 目录 + 权限 + udev 规则一次搞定 \
     mkdir -p /etc/nut /var/run/nut /var/state/ups && \
     chown -R nut:nut /etc/nut /var/run/nut /var/state/ups && \
@@ -17,6 +17,7 @@ RUN apk add --no-cache \
         'SUBSYSTEM=="usb", ATTR{idVendor}=="06da", MODE="0666"' \
         > /etc/udev/rules.d/99-nut-ups.rules
 
+COPY driver_event_bridge.py /driver_event_bridge.py
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 

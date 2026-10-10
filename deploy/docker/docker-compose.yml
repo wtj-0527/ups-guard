@@ -15,6 +15,8 @@ services:
       - UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
       - UPS_PORT=${UPS_PORT:-auto}
       - UPSD_LISTEN=0.0.0.0
+      - NUT_EVENT_BRIDGE=${NUT_EVENT_BRIDGE:-false}
+      - NUT_EVENT_SECRET=${NUT_EVENT_SECRET:-}
       - UPSD_USER=${UPSD_USER:-admin}
       - UPSD_PASSWORD=${UPSD_PASSWORD:-secret}
       - UPSMON_USER=${UPSMON_USER:-monuser}
@@ -65,6 +67,8 @@ services:
     # ============================================================
     environment:
       - NUT_HOST=nut-server
+      - NUT_EVENT_BRIDGE=${NUT_EVENT_BRIDGE:-false}
+      - NUT_EVENT_SECRET=${NUT_EVENT_SECRET:-}
       - NUT_PORT=3493
       - NUT_USERNAME=${UPSMON_USER:-monuser}
       - NUT_PASSWORD=${UPSMON_PASSWORD:-secret}

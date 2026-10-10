@@ -30,7 +30,10 @@ class AuthMiddleware:
         if self.skip_auth:
             logger.warning("SKIP_AUTH enabled: API authentication is disabled (development only!)")
         # Paths that don't require authentication
-        self.exclude_paths = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
+        # /api/system/driver-event uses its own NUT_EVENT_SECRET check
+        # (see api/driver_events.py) instead of the full-privilege API token.
+        self.exclude_paths = {"/health", "/", "/docs", "/openapi.json", "/redoc",
+                              "/api/system/driver-event"}
         self.exclude_prefixes = ["/ws", "/api/bootstrap"]
 
     @property

@@ -35,7 +35,9 @@ def assess_voltage_quality(
     2. 稳定性 (30分)：波动范围
     3. 安全性 (30分)：是否接近切换阈值
     """
-    if input_voltage is None or input_voltage_nominal is None:
+    # Zero input voltage is expected during an outage. It must not break UPS telemetry.
+    if (input_voltage is None or input_voltage <= 0
+            or input_voltage_nominal is None or input_voltage_nominal <= 0):
         return None
 
     issues = []

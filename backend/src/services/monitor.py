@@ -1,6 +1,9 @@
 """UPS 状态监控引擎"""
 import asyncio
+import os
+import time
 import logging
+from collections import deque
 from datetime import datetime
 from typing import Optional, Callable
 from models import UpsStatus, UpsData, EventType, Metric
@@ -8,6 +11,7 @@ from services.nut_client import NutClientInterface
 from services.shutdown_manager import ShutdownManager
 from services.history import get_history_service
 from services.notifier import get_notifier_service
+from services.driver_event_source import read_driver_variables
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,7 @@ class UpsMonitor:
         self.config = config
         
         self._current_status = UpsStatus.OFFLINE
+        self._last_power_status = None  # Connectivity loss is not a power transition.
         self._current_data: Optional[UpsData] = None
         self._monitor_task: Optional[asyncio.Task] = None
         self._sample_task: Optional[asyncio.Task] = None
@@ -57,7 +62,15 @@ class UpsMonitor:
         # 事件驱动相关
         self._event_driven_client = None
         self._event_mode_active = False
+        self._driver_bridge_data = {}
+        self._driver_bridge_seen = 0.0
+        self._driver_bridge_frames = 0
+        self._driver_bridge_seq = 0  # 每个非心跳帧递增
+        self._driver_bridge_consumed_seq = 0  # 监控循环已处理到的帧序号
+        self._driver_bridge_statuses = deque(maxlen=512)
+        self._driver_bridge_wakeup = asyncio.Event()
         self._communication_count_today = 0
+        self._last_persisted_count = -1  # 避免事件缓存重复读取时反复持久化同一计数
         self._last_update_time: Optional[datetime] = None
         self._start_time = datetime.now()
         
@@ -134,6 +147,8 @@ class UpsMonitor:
 
             self._current_data = data
             self._current_status = data.status
+            if data.status in (UpsStatus.ONLINE, UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY):
+                self._last_power_status = data.status
 
             history_service = await get_history_service()
             notifier_service = get_notifier_service()
@@ -378,7 +393,9 @@ class UpsMonitor:
                         await self._process_ups_data(data)
                         
                         # 每60次通信持久化一次统计（约每5分钟）
-                        if self._communication_count_today % 60 == 0:
+                        if (self._communication_count_today % 60 == 0
+                                and self._communication_count_today != self._last_persisted_count):
+                            self._last_persisted_count = self._communication_count_today
                             await self._persist_daily_stats()
                         
                         # 根据模式调整轮询间隔
@@ -389,8 +406,19 @@ class UpsMonitor:
                             # 事件驱动模式下，使用较长的轮询间隔作为备份
                             poll_interval = self.config.poll_interval_fallback if self.config else 60
                         
-                        await asyncio.sleep(poll_interval)
+                        if self._bridge_active():
+                            if self._driver_bridge_statuses:
+                                continue
+                            try:
+                                await asyncio.wait_for(self._driver_bridge_wakeup.wait(), timeout=min(poll_interval, 15))
+                            except asyncio.TimeoutError:
+                                pass
+                            self._driver_bridge_wakeup.clear()
+                        else:
+                            await asyncio.sleep(poll_interval)
                     else:
+                        if self._bridge_active():
+                            await asyncio.sleep(1)  # Let event ingress run while the stream is unavailable.
                         # 无法读取状态，标记为离线并主动重连
                         logger.warning(f"Lost connection to UPS, _connection_notified={self._connection_notified}, attempting reconnect...")
                         self._current_status = UpsStatus.OFFLINE
@@ -403,7 +431,7 @@ class UpsMonitor:
                             logger.info("NUT_DISCONNECTED notification sent")
 
                         # 主动触发重连（如果是 RealNutClient）- 使用递增延迟
-                        if hasattr(self.nut_client, '_reconnect'):
+                        if not self._bridge_active() and hasattr(self.nut_client, '_reconnect'):
                             # 计算重连间隔：使用递增延迟避免频繁重连
                             # 前 5 次快速重试（5s, 10s, 15s, 20s, 25s）
                             # 之后使用固定间隔（60s）
@@ -468,7 +496,11 @@ class UpsMonitor:
         start_time = datetime.now()
         
         try:
-            vars_dict = await self.nut_client.list_vars()
+            source = 'poll'
+            if self._bridge_active():
+                vars_dict, source = await read_driver_variables(self)
+            else:
+                vars_dict = await self.nut_client.list_vars()
             
             if not vars_dict:
                 logger.debug("_read_ups_data: vars_dict is empty, returning None")
@@ -476,9 +508,13 @@ class UpsMonitor:
             
             # 计算响应时间
             response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
-            self._response_times.append(response_time_ms)
-            self._communication_count_today += 1
-            self._last_update_time = datetime.now()
+            # 只有真实的 NUT 查询计入响应时间；只有新数据（查询或新事件帧）
+            # 计入通信次数和最后更新时间，避免重复读取事件缓存造成统计失真
+            if source == 'poll':
+                self._response_times.append(response_time_ms)
+            if source != 'cache':
+                self._communication_count_today += 1
+                self._last_update_time = datetime.now()
             
             # 限制响应时间数组大小（保留最近100次）
             if len(self._response_times) > 100:
@@ -869,6 +905,11 @@ class UpsMonitor:
     async def _on_status_changed(self, old_status: UpsStatus, new_status: UpsStatus, data: UpsData):
         """处理状态变化"""
 
+        # Compare confirmed power states, preserving the last state across OFFLINE.
+        if new_status in (UpsStatus.ONLINE, UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY):
+            old_status = self._last_power_status or old_status
+            self._last_power_status = new_status
+
         # 跟踪电池供电状态（用于电量平滑）
         if new_status in (UpsStatus.ON_BATTERY, UpsStatus.LOW_BATTERY) and old_status == UpsStatus.ONLINE:
             # 刚切换到电池供电
@@ -1026,6 +1067,38 @@ class UpsMonitor:
         except Exception as e:
             logger.error(f"Failed to record metric sample: {e}", exc_info=True)
     
+    def _bridge_active(self) -> bool:
+        """原生驱动事件桥接是否启用（环境变量开启且配置为事件驱动/混合模式）"""
+        return bool(
+            os.environ.get('NUT_EVENT_BRIDGE') == 'true'
+            and self.config
+            and self.config.event_driven_enabled
+            and self.config.monitoring_mode in ('event_driven', 'hybrid')
+        )
+
+    def ingest_driver_frame(self, variables: dict, healthy: bool, reason: str) -> bool:
+        """接收桥接推送的驱动帧，返回事件模式是否处于激活状态"""
+        self._driver_bridge_data = dict(variables) if healthy else {}
+        if reason == 'STATUS' and healthy:
+            self._driver_bridge_statuses.append((time.monotonic(), dict(variables)))
+        elif not healthy:
+            self._driver_bridge_statuses.clear()
+        self._driver_bridge_seen = time.monotonic()
+        self._driver_bridge_frames += 1
+        if reason != 'HEARTBEAT':
+            self._driver_bridge_seq += 1
+        self._event_mode_active = bool(
+            self._bridge_active() and healthy and variables.get('ups.status'))
+        if reason != 'HEARTBEAT' or not healthy:
+            self._driver_bridge_wakeup.set()
+        return self._event_mode_active
+
+    def driver_bridge_age_seconds(self) -> Optional[float]:
+        """距最近一帧桥接数据的秒数；从未收到时返回 None"""
+        if not self._driver_bridge_seen:
+            return None
+        return time.monotonic() - self._driver_bridge_seen
+
     async def _try_start_event_driven_mode(self):
         """尝试启动事件驱动模式"""
         if not self.config or not self.config.event_driven_enabled:
@@ -1034,6 +1107,10 @@ class UpsMonitor:
         if self.config.monitoring_mode not in ("event_driven", "hybrid"):
             return
             
+        if self._bridge_active():
+            logger.info('Using native NUT driver event bridge; no LISTEN or network polling')
+            return
+
         try:
             # 动态导入避免循环依赖
             from services.nut_client import EventDrivenNutClient

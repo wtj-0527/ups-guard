@@ -165,6 +165,8 @@ docker logs -f ups-guard-backend
 
 ## 🔌 事件驱动未激活
 
+> 协议说明：标准 NUT 的 upsd TCP 协议没有 `LISTEN` 命令；`ERR UNKNOWN-COMMAND` 不能据此归因于 UPS 型号或固件。内置 Docker NUT 部署现在可使用[原生驱动事件桥接](native-driver-events.md)，直接接收驱动 Unix socket 更新，并按配置在事件失效时轮询兜底、恢复后切回。下方关于 `LISTEN` 的排查描述是既有实现的历史说明，不代表标准 NUT 协议能力。
+
 ### Q2: 我选择混合模式，为什么事件驱动状态显示"未激活"？
 
 事件驱动未激活有 4 个常见原因：
