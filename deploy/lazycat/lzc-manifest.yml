@@ -3,10 +3,10 @@
 lzc-sdk-version: '0.1'
 name: UPS Guard
 package: cloud.lazycat.app.ups-guard
-version: 1.0.0
+version: 1.0.84
 min_os_version: 1.3.8
 description: |
-  【1.0.0 版本】
+  【1.0.84 版本】
   专业的 UPS 智能监控与管理应用。
   
   【功能特点】
@@ -32,7 +32,7 @@ locales:
     name: "UPS Guard"
     description: "UPS Guard is a full-featured, secure, and high-performance UPS monitoring solution. Thoroughly tested and optimized, it is production-ready and can be confidently deployed in home, small office, or data center environments."
 license: https://choosealicense.com/licenses/agpl-3.0/
-homepage: https://github.com/KingBoyAndGirl/ups-guard
+homepage: https://github.com/wtj-0527/ups-guard
 author: 王.W
 
 application:
@@ -52,7 +52,7 @@ application:
 
 services:
   ups-guard:
-    image: registry.lazycat.cloud/wtj_0527/wtjking/ups-guard:0d3062047a286b2f
+    image: registry.cn-shanghai.aliyuncs.com/wtjking/ups-guard:1.0.84
     binds:
       - /lzcapp/var/data:/data
     environment:
