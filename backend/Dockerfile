@@ -6,9 +6,16 @@ WORKDIR /app
 # 1️⃣ 先只复制依赖声明文件（利用 Docker 缓存）
 COPY pyproject.toml ./
 
+# 构建时可切换 PyPI 镜像，并为较慢的网络增加超时和重试
+ARG UV_INDEX_URL=https://pypi.org/simple
+ARG UV_HTTP_TIMEOUT=120
+ARG UV_HTTP_RETRIES=5
+
 # 2️⃣ 使用 uv venv 安装依赖（代码没变时这一层会命中缓存）
 RUN uv venv /app/.venv && \
-    uv pip install --python /app/.venv/bin/python --no-cache -r pyproject.toml
+    UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT}" UV_HTTP_RETRIES="${UV_HTTP_RETRIES}" \
+    uv pip install --python /app/.venv/bin/python --no-cache \
+      --index-url "${UV_INDEX_URL}" -r pyproject.toml
 
 # 3️⃣ 再复制源代码（代码变更不会触发重新安装依赖）
 COPY src ./src

@@ -64,6 +64,34 @@ docker-compose exec nut-server upsc <发现的UPS名称>@localhost
 
 ## 常见问题
 
+### 后端构建下载依赖超时
+
+如果 `uv pip install` 报 `Failed to fetch`、`operation timed out`，在本目录的 `.env` 中设置：
+
+```dotenv
+UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+UV_HTTP_TIMEOUT=120
+UV_HTTP_RETRIES=5
+```
+
+这些配置会作为构建参数传入后端 Dockerfile，无需修改源码。默认仍使用官方 PyPI，可按网络情况切换下载源。
+
+```bash
+sudo docker compose --progress plain build backend
+sudo docker compose up -d
+sudo docker compose ps
+```
+
+### Web 端口被占用
+
+如果报 `failed to bind host port 0.0.0.0:80/tcp: address already in use`，在 `.env` 中将 `HTTP_PORT` 改为一个空闲端口（例如 `8088`），然后执行：
+
+```bash
+sudo docker compose up -d frontend
+```
+
+通过 `http://<服务器IP>:8088` 访问，启用防火墙时需放行对应端口。
+
 ### UPS 未识别
 
 1. 检查 USB 连接：`lsusb`
