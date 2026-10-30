@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -9,8 +9,8 @@ ARG VITE_API_TOKEN=dev-token-123
 # 设置环境变量（供 Vite 构建时使用）
 ENV VITE_API_TOKEN=$VITE_API_TOKEN
 
-# 安装 pnpm
-RUN npm install -g pnpm
+# 固定 pnpm 版本，与 CI 保持一致，避免新版构建脚本审批策略导致安装失败
+RUN npm install -g pnpm@8.15.9
 
 # 复制依赖文件
 COPY package.json ./
