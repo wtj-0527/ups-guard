@@ -305,6 +305,14 @@ lzc-cli package -m lzc-manifest.yml -o ups-guard.lpk
 - [🏗️ 系统架构](architecture.md) - 技术架构设计
 - [🔌 插件开发](development/plugin-dev.md) - 自定义插件开发
 
+## 💬 微信交流群
+
+欢迎加入 **UPS 微信交流群**，交流 UPS 使用经验、部署问题和功能建议。使用微信扫描下方二维码加入群聊。
+
+<img width="300" alt="UPS 微信交流群二维码" src="../images/wechat-group.png" />
+
+> 二维码有效期：**2026 年 11 月 6 日前**。如已过期，请通过下方 Issues 或 Discussions 提醒更新。
+
 ## 📧 联系我们
 
 - GitHub: [@KingBoyAndGirl](https://github.com/KingBoyAndGirl)

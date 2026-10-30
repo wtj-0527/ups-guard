@@ -368,6 +368,18 @@ If this project is helpful to you, feel free to buy the author a coffee ☕
 
 > 💖 您的支持是项目持续更新的动力！/ Your support keeps the project going!
 
+## 💬 微信交流群 / WeChat Community
+
+欢迎加入 **UPS 微信交流群**，交流 UPS 使用经验、部署问题和功能建议。使用微信扫描下方二维码加入群聊。
+
+Join the **UPS WeChat group** to share UPS tips, discuss deployment questions, and suggest features. Scan the QR code below with WeChat to join.
+
+<img width="300" alt="UPS 微信交流群二维码 / UPS WeChat group QR code" src="docs/images/wechat-group.png" />
+
+> 二维码有效期：**2026 年 11 月 6 日前**。如已过期，请通过下方 Issues 或 Discussions 提醒更新。
+>
+> QR code valid **before November 6, 2026**. If it has expired, please request an updated code via Issues or Discussions below.
+
 ## 📧 联系我们 / Contact Us
 
 - GitHub: [@KingBoyAndGirl](https://github.com/KingBoyAndGirl)

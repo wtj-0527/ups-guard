@@ -283,6 +283,14 @@ See:
 - [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
 - [ECharts](https://echarts.apache.org/) - Data visualization library
 
+## 💬 WeChat Community
+
+Join the **UPS WeChat group** to share UPS tips, discuss deployment questions, and suggest features. Scan the QR code below with WeChat to join.
+
+<img width="300" alt="UPS WeChat group QR code" src="../images/wechat-group.png" />
+
+> QR code valid **before November 6, 2026**. If it has expired, please request an updated code via Issues or Discussions below.
+
 ## 📧 Contact Us
 
 - GitHub: [@KingBoyAndGirl](https://github.com/KingBoyAndGirl)
