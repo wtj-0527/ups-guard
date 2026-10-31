@@ -105,6 +105,39 @@ printf '%s' "$SCAN_RESULT_FIXTURE"
         self.assertIn("port = auto", self.config())
         self.assertFalse(self.calls.exists())
 
+    def test_identity_overrides_are_optional_and_persist_on_regeneration(self):
+        for _ in range(2):
+            result = self.run_phase(
+                UPS_DRIVER="nutdrv_qx", UPS_PORT="/dev/ttyUSB0",
+                UPS_MFR="VISENCH", UPS_MODEL="C3K",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for prefix in ("device", "ups"):
+                self.assertIn(f'override.{prefix}.mfr = "VISENCH"', self.config())
+                self.assertIn(f'override.{prefix}.model = "C3K"', self.config())
+        result = self.run_phase(UPS_DRIVER="nutdrv_qx", UPS_PORT="/dev/ttyUSB0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("override.device.", self.config())
+
+    def test_identity_text_is_escaped_and_cannot_inject_configuration(self):
+        result = self.run_phase(
+            UPS_DRIVER="nutdrv_qx", UPS_PORT="/dev/ttyUSB0",
+            UPS_MFR='威神 "UPS" \\ Lab', UPS_MODEL="C3K #1",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('override.device.mfr = "威神 \\"UPS\\" \\\\ Lab"', self.config())
+        self.assertIn('override.device.model = "C3K #1"', self.config())
+        for key in ("UPS_MFR", "UPS_MODEL"):
+            result = self.run_phase(**{key: "bad\n    driver = dummy-ups"})
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_identity_overrides_do_not_hide_dummy_mode(self):
+        result = self.run_phase(UPS_MFR="VISENCH", UPS_MODEL="C3K")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("driver = dummy-ups", self.config())
+        self.assertNotIn("override.device.", self.config())
+        self.assertNotIn("override.ups.", self.config())
+
     def test_rejects_protocol_configuration_injection(self):
         result = self.run_phase(UPS_PROTOCOL="ablerex\n    driver = dummy-ups")
         self.assertNotEqual(result.returncode, 0)
@@ -132,6 +165,7 @@ printf '%s' "$count" > "$COUNTER"
         result = self.run_phase(
             monitor=True, UPS_DRIVER="nutdrv_qx",
             UPS_PORT="/dev/ttyUSB0", UPS_PROTOCOL="ablerex",
+            UPS_MFR="VISENCH", UPS_MODEL="C3K",
         )
         self.assertEqual(result.returncode, 77, result.stderr)
         self.assertEqual(self.calls.read_text(), "stop\nstart\n" * 3)
@@ -139,6 +173,8 @@ printf '%s' "$count" > "$COUNTER"
         self.assertIn("port = /dev/ttyUSB0", self.config())
         self.assertIn("protocol = ablerex", self.config())
         self.assertNotIn("dummy-ups", self.config())
+        self.assertIn('override.device.mfr = "VISENCH"', self.config())
+        self.assertIn('override.device.model = "C3K"', self.config())
 
 
 if __name__ == "__main__":

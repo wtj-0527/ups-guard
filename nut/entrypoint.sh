@@ -67,6 +67,8 @@ UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
 UPS_PORT=${UPS_PORT:-auto}
 UPS_AUTO_DETECT=${UPS_AUTO_DETECT:-true}
 UPS_PROTOCOL=${UPS_PROTOCOL:-}
+UPS_MFR=${UPS_MFR:-}
+UPS_MODEL=${UPS_MODEL:-}
 UPS_DESC=${UPS_DESC:-}  # 留空则自动生成
 UPSD_LISTEN=${UPSD_LISTEN:-0.0.0.0}
 UPSD_USER=${UPSD_USER:-admin}
@@ -112,6 +114,27 @@ if [ -n "$UPS_PROTOCOL" ] && [[ ! "$UPS_PROTOCOL" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
     echo "ERROR: UPS_PROTOCOL must be a protocol name without whitespace"
     exit 1
 fi
+
+# 标识覆盖只接受单行文本，转义在写入配置时处理。
+for identity_value in "$UPS_MFR" "$UPS_MODEL"; do
+    if [[ "$identity_value" == *$'\n'* || "$identity_value" == *$'\r'* ]]; then
+        echo "ERROR: UPS_MFR and UPS_MODEL must be single-line text"
+        exit 1
+    fi
+done
+
+generate_identity_opts() {
+    # 模拟/断线状态必须保留其标识，不能伪装成已连接的真实设备。
+    [ "$1" != "dummy-ups" ] || return 0
+    local field value escaped
+    for field in mfr model; do
+        if [ "$field" = mfr ]; then value="$UPS_MFR"; else value="$UPS_MODEL"; fi
+        [ -n "$value" ] || continue
+        escaped=$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        printf '    override.device.%s = "%s"\n' "$field" "$escaped"
+        printf '    override.ups.%s = "%s"\n' "$field" "$escaped"
+    done
+}
 
 # 自动发现 UPS 设备
 echo "Scanning for UPS devices..."
@@ -344,6 +367,7 @@ ${EXTRA_DRIVER_OPTS}    # 覆盖 UPS 报告的异常低电量阈值
     # 增加轮询间隔，减少 USB 通信压力（低电量时 UPS 响应可能变慢）
     pollinterval = 5
 ${RUNTIMECAL_OPTS}
+$(generate_identity_opts "$UPS_DRIVER")
 EOF
 
 echo "Generated ups.conf with driver: $UPS_DRIVER"
@@ -753,6 +777,7 @@ ${subdriver_opt}
     ignorelb
     pollinterval = 5
 ${runtimecal_opts}
+$(generate_identity_opts "$found_driver")
 SWITCH_EOF
 
                     # 更新 upsmon.conf 中的 UPS 名称
@@ -940,6 +965,7 @@ ${subdriver_opt_wait}
     ignorelb
     pollinterval = 5
 ${runtimecal_opts}
+$(generate_identity_opts "$new_driver")
 DUMMY_WAIT_RECONNECT_EOF
 
                     sed -i "s/^MONITOR .* 1 $UPSMON_USER/MONITOR ${new_ups_name}@localhost 1 $UPSMON_USER/" /etc/nut/upsmon.conf
@@ -1204,6 +1230,7 @@ ${subdriver_opt_mon}
     ignorelb
     pollinterval = 5
 ${runtimecal_opts}
+$(generate_identity_opts "$found_driver")
 MONITOR_EOF
 
                 # 更新 upsmon.conf 中的 UPS 名称
@@ -1302,6 +1329,7 @@ ${subdriver_opt_mon}
     ignorelb
     pollinterval = 5
 ${runtimecal_opts_fallback}
+$(generate_identity_opts "$fallback_driver")
 FALLBACK_EOF
                             echo "$(date): 📝 已更新 ups.conf，驱动切换为 ${fallback_driver}"
                         else

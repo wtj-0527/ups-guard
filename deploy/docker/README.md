@@ -103,6 +103,25 @@ sudo docker compose exec nut-server upsc ups@localhost
 
 生成的配置应包含 `driver = nutdrv_qx`、`port = /dev/ttyUSB0` 和 `protocol = ablerex`。请以 `upsc` 返回的真实设备数据确认连通，不要用模拟设备显示的电量或在线状态判断。
 
+### 厂家和型号显示为重复数字
+
+如果真实电压和状态已读通，但 `device.mfr`、`device.model` 返回重复数字等异常标识，可在 `.env` 中设置：
+
+```dotenv
+UPS_MFR=VISENCH
+UPS_MODEL=C3K
+```
+
+留空时使用驱动原始值。非空时生成 `override.device.mfr/model` 和兼容的 `override.ups.mfr/model`，仅覆盖标识，不修改电压、电量和状态，也不表示修复了底层协议解析。模拟和断线等待设备不应用标识覆盖，以保留故障提示。
+
+```bash
+sudo docker compose --env-file .env -f docker-compose.yml --progress plain build nut-server
+sudo docker compose --env-file .env -f docker-compose.yml up -d --no-deps --force-recreate nut-server
+sudo docker exec ups-guard-nut upsc ups@localhost
+```
+
+厂家、型号配置会在重建配置和驱动重连时保留。不要直接编辑容器内自动生成的 `ups.conf`，也不要仅重启旧容器期待新环境变量生效。
+
 ### 后端构建下载依赖超时
 
 如果 `uv pip install` 报 `Failed to fetch`、`operation timed out`，在本目录的 `.env` 中设置：
