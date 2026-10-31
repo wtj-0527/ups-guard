@@ -42,7 +42,7 @@ generate_runtimecal_opts() {
                 # 这些驱动的 UPS 通常不报告 battery.runtime，使用保守默认值
                 # 300s@100% 满载，2400s@50% 空载 (适用于大多数家用小型 UPS)
                 cal_value="300,100,2400,50"
-                log_info "驱动 ${driver_name} 需要软件估算 battery.runtime，使用默认 runtimecal=${cal_value}"
+                log_info "驱动 ${driver_name} 需要软件估算 battery.runtime，使用默认 runtimecal=${cal_value}" >&2
                 ;;
             *)
                 # usbhid-ups 等驱动通常硬件直接报告 battery.runtime，无需配置
@@ -65,6 +65,8 @@ generate_runtimecal_opts() {
 UPS_NAME=${UPS_NAME:-}  # 留空则自动生成
 UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
 UPS_PORT=${UPS_PORT:-auto}
+UPS_AUTO_DETECT=${UPS_AUTO_DETECT:-true}
+UPS_PROTOCOL=${UPS_PROTOCOL:-}
 UPS_DESC=${UPS_DESC:-}  # 留空则自动生成
 UPSD_LISTEN=${UPSD_LISTEN:-0.0.0.0}
 UPSD_USER=${UPSD_USER:-admin}
@@ -93,10 +95,30 @@ IDLE_LOAD=${IDLE_LOAD:-5}
 AUTO_BRAND=""
 AUTO_SERIAL=""
 AUTO_MODEL=""
+VENDOR_ID=""
+PRODUCT_ID=""
+
+case "$UPS_AUTO_DETECT" in
+    true|false) ;;
+    *) echo "ERROR: UPS_AUTO_DETECT must be true or false"; exit 1 ;;
+esac
+
+# 显式设备路径代表手动配置，USB 扫描不能识别所有 USB 转串口 UPS。
+case "$UPS_PORT" in
+    /dev/*) UPS_AUTO_DETECT=false ;;
+esac
+
+if [ -n "$UPS_PROTOCOL" ] && [[ ! "$UPS_PROTOCOL" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+    echo "ERROR: UPS_PROTOCOL must be a protocol name without whitespace"
+    exit 1
+fi
 
 # 自动发现 UPS 设备
 echo "Scanning for UPS devices..."
-if command -v nut-scanner &> /dev/null; then
+if [ "$UPS_AUTO_DETECT" = false ]; then
+    echo "Manual UPS configuration: driver=${UPS_DRIVER}, port=${UPS_PORT}, protocol=${UPS_PROTOCOL:-auto}"
+    echo "USB auto-discovery disabled; preserving configured driver and port"
+elif command -v nut-scanner &> /dev/null; then
     # 尝试扫描 USB UPS 设备
     SCAN_RESULT=$(nut-scanner -U 2>/dev/null || echo "")
     
@@ -276,6 +298,10 @@ fi
 # 生成 ups.conf
 # 构建可选参数
 EXTRA_DRIVER_OPTS=""
+if [ -n "$UPS_PROTOCOL" ]; then
+    EXTRA_DRIVER_OPTS="${EXTRA_DRIVER_OPTS}    protocol = ${UPS_PROTOCOL}
+"
+fi
 if [ -n "$VENDOR_ID" ]; then
     EXTRA_DRIVER_OPTS="${EXTRA_DRIVER_OPTS}    vendorid = \"$VENDOR_ID\"
 "
@@ -444,7 +470,9 @@ cleanup_usb_claims() {
         sleep 2
     fi
 }
-cleanup_usb_claims
+if [ "$UPS_AUTO_DETECT" = true ]; then
+    cleanup_usb_claims
+fi
 echo ""
 
 # ========== USB 设备权限修复 ==========
@@ -477,7 +505,9 @@ fix_usb_permissions() {
         echo "  All USB device permissions OK"
     fi
 }
-fix_usb_permissions
+if [ "$UPS_AUTO_DETECT" = true ]; then
+    fix_usb_permissions
+fi
 echo ""
 
 # 显示 USB 设备信息（调试用）
@@ -589,6 +619,32 @@ monitor_ups_driver() {
     echo "  快速重试: 前 ${max_fast_retries} 次"
     echo "  当前驱动: ${UPS_DRIVER}"
     echo "═══════════════════════════════════════"
+
+    # 手动配置不能用 USB 扫描判断设备是否存在，也不能回退为模拟设备。
+    # 串口暂时断开时按原配置重试，不改写 driver、port 或 protocol。
+    if [ "$UPS_AUTO_DETECT" = false ]; then
+        echo "Manual driver monitoring: preserving ${UPS_DRIVER} on ${UPS_PORT}"
+        while true; do
+            sleep "$check_interval"
+            if upsc "${UPS_NAME}@localhost" ups.status >/dev/null 2>&1; then
+                if [ "$retry_count" -gt 0 ]; then
+                    echo "$(date): ✅ 手动配置的 UPS 驱动通信已恢复"
+                fi
+                retry_count=0
+                continue
+            fi
+
+            retry_count=$((retry_count + 1))
+            echo "$(date): ⚠️ 手动配置的 UPS 通信中断，第 ${retry_count} 次按原配置重试"
+            timeout 10 upsdrvctl stop >/dev/null 2>&1 || true
+            sleep "$base_reconnect_delay"
+            if timeout 30 upsdrvctl start; then
+                echo "$(date): ✅ 手动配置的 UPS 驱动已重新启动"
+            else
+                echo "$(date): ❌ 驱动重启失败，保留原配置并继续重试"
+            fi
+        done
+    fi
 
     # 如果是 dummy 驱动，使用简化的监控模式，但仍然扫描真实设备
     if [ "$UPS_DRIVER" = "dummy-ups" ]; then

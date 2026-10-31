@@ -14,6 +14,8 @@ services:
       - UPS_DESC=${UPS_DESC:-}
       - UPS_DRIVER=${UPS_DRIVER:-usbhid-ups}
       - UPS_PORT=${UPS_PORT:-auto}
+      - UPS_AUTO_DETECT=${UPS_AUTO_DETECT:-true}
+      - UPS_PROTOCOL=${UPS_PROTOCOL:-}
       - UPSD_LISTEN=0.0.0.0
       - NUT_EVENT_BRIDGE=${NUT_EVENT_BRIDGE:-false}
       - NUT_EVENT_SECRET=${NUT_EVENT_SECRET:-}

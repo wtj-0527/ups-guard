@@ -7,6 +7,17 @@ on:
     branches: [ main ]
 
 jobs:
+  nut-test:
+    name: NUT Entrypoint Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Test driver configuration and reconnect
+        run: python -m unittest discover -s nut/tests -v
+
   backend-lint:
     name: Backend Linting
     runs-on: ubuntu-latest

@@ -64,6 +64,45 @@ docker-compose exec nut-server upsc <发现的UPS名称>@localhost
 
 ## 常见问题
 
+### USB 转串口 UPS 被识别成模拟设备
+
+对于已在 NUT 中验证可用的串口 UPS，请使用原来可用的驱动和协议。例如 Visench C3K 的用户已验证配置：
+
+```dotenv
+UPS_NAME=ups
+UPS_DRIVER=nutdrv_qx
+UPS_PORT=/dev/ttyUSB0
+UPS_AUTO_DETECT=false
+UPS_PROTOCOL=ablerex
+```
+
+`UPS_AUTO_DETECT=false` 会保留手动配置，跳过 USB 扫描；`UPS_PORT` 为 `/dev/...` 路径时也会自动采用手动模式。驱动通信中断后仍按原驱动、端口和协议重试，不会切换到 `dummy-ups`。协议变量必须使用 `UPS_PROTOCOL`，单独添加 `protocol` 或 `PROTOCOL` 不会传入容器。
+
+确认串口节点在容器内可见：
+
+```bash
+sudo docker exec ups-guard-nut ls -l /dev/ttyUSB0
+```
+
+如果不存在，需先在 Compose 的 `nut-server` 服务下增加对应的设备映射（按实际设备路径调整）：
+
+```yaml
+devices:
+  - /dev/ttyUSB0:/dev/ttyUSB0
+```
+
+更新后重新构建 NUT 和前端镜像，再重新创建容器，使 `.env` 中的配置生效；仅执行 `docker restart` 不会更新容器环境：
+
+```bash
+sudo docker compose --progress plain build nut-server frontend
+sudo docker compose up -d --force-recreate nut-server backend frontend
+sudo docker exec ups-guard-nut cat /etc/nut/ups.conf
+sudo docker compose logs --tail 100 nut-server
+sudo docker compose exec nut-server upsc ups@localhost
+```
+
+生成的配置应包含 `driver = nutdrv_qx`、`port = /dev/ttyUSB0` 和 `protocol = ablerex`。请以 `upsc` 返回的真实设备数据确认连通，不要用模拟设备显示的电量或在线状态判断。
+
 ### 后端构建下载依赖超时
 
 如果 `uv pip install` 报 `Failed to fetch`、`operation timed out`，在本目录的 `.env` 中设置：

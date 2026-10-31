@@ -752,22 +752,24 @@ const copyDiagnosticsLogs = () => {
   }
 }
 
-// 判断是否在事件日志页面（该页面不需要弹出诊断面板，因为可以直接查看事件）
-const isEventsPage = computed(() => route.path === '/events')
+// 设置和事件页面必须在连接异常时仍可访问，便于排查和修改配置。
+const isDiagnosticsBypassPage = computed(() =>
+  route.path === '/events' || route.path === '/settings'
+)
 
 // 监听路由变化
 watch(() => route.path, (newPath, oldPath) => {
   console.log('[App.vue] Route changed:', oldPath, '->', newPath)
 
-  if (newPath === '/events') {
-    // 跳转到事件日志页面，关闭诊断面板
+  if (newPath === '/events' || newPath === '/settings') {
+    // 跳转到故障排查页面，关闭诊断面板
     if (showGlobalDiagnostics.value) {
       console.log('[App.vue] Navigated to events page, closing diagnostics panel')
       showGlobalDiagnostics.value = false
       stopDiagnosticsRefresh()
     }
-  } else if (oldPath === '/events') {
-    // 从事件日志页面跳转到其他页面，如果仍有异常则重新显示诊断面板
+  } else if (oldPath === '/events' || oldPath === '/settings') {
+    // 返回监控页面时，如果仍有异常则重新显示诊断面板
     if (needsGlobalDiagnostics.value && !showGlobalDiagnostics.value) {
       console.log('[App.vue] Left events page with active issues, showing diagnostics panel')
       showGlobalDiagnostics.value = true
@@ -779,14 +781,14 @@ watch(() => route.path, (newPath, oldPath) => {
 
 // 监听 WebSocket 推送的 NUT 连接状态事件
 watch(connectionEvent, (event, oldEvent) => {
-  console.log('[App.vue] connectionEvent changed:', event, 'old:', oldEvent, 'isEventsPage:', isEventsPage.value)
+  console.log('[App.vue] connectionEvent changed:', event, 'old:', oldEvent, 'isDiagnosticsBypassPage:', isDiagnosticsBypassPage.value)
   if (!event) return
 
   if (event.type === 'NUT_DISCONNECTED') {
     // NUT 连接断开
-    console.log('[App.vue] NUT disconnected, isEventsPage:', isEventsPage.value, 'showGlobalDiagnostics:', showGlobalDiagnostics.value)
-    // 事件日志页面不弹出诊断面板，用户可以直接查看事件
-    if (!isEventsPage.value) {
+    console.log('[App.vue] NUT disconnected, isDiagnosticsBypassPage:', isDiagnosticsBypassPage.value, 'showGlobalDiagnostics:', showGlobalDiagnostics.value)
+    // 设置和事件页面不弹出诊断面板。
+    if (!isDiagnosticsBypassPage.value) {
       console.log('[App.vue] Showing diagnostics panel...')
       showGlobalDiagnostics.value = true
       fetchGlobalDiagnostics()
@@ -804,7 +806,7 @@ watch(connectionEvent, (event, oldEvent) => {
 
 // 监听 needsGlobalDiagnostics 变化
 watch(needsGlobalDiagnostics, (needsDiag, wasDiag) => {
-  console.log('[App.vue] needsGlobalDiagnostics changed:', needsDiag, 'was:', wasDiag, 'isEventsPage:', isEventsPage.value, 'lastReceivedAt:', lastReceivedAt.value)
+  console.log('[App.vue] needsGlobalDiagnostics changed:', needsDiag, 'was:', wasDiag, 'isDiagnosticsBypassPage:', isDiagnosticsBypassPage.value, 'lastReceivedAt:', lastReceivedAt.value)
 
   // 初始化时 wasDiag 为 undefined，需要特殊处理
   const wasNormal = wasDiag === false
@@ -815,8 +817,8 @@ watch(needsGlobalDiagnostics, (needsDiag, wasDiag) => {
   // 这样避免了刚刷新页面时因为数据还在加载就显示诊断面板
   if (needsDiag && wasNormal) {
     // 从正常变成异常
-    console.log('[App.vue] Connection issue detected (was normal), isEventsPage:', isEventsPage.value)
-    if (!isEventsPage.value) {
+    console.log('[App.vue] Connection issue detected (was normal), isDiagnosticsBypassPage:', isDiagnosticsBypassPage.value)
+    if (!isDiagnosticsBypassPage.value) {
       console.log('[App.vue] Showing diagnostics panel from needsGlobalDiagnostics...')
       showGlobalDiagnostics.value = true
       fetchGlobalDiagnostics()
@@ -824,8 +826,8 @@ watch(needsGlobalDiagnostics, (needsDiag, wasDiag) => {
     }
   } else if (needsDiag && isInitial && lastReceivedAt.value > 0) {
     // 初始状态且已经收到过数据，说明是真正的问题
-    console.log('[App.vue] Connection issue detected on init (already received data), isEventsPage:', isEventsPage.value)
-    if (!isEventsPage.value) {
+    console.log('[App.vue] Connection issue detected on init (already received data), isDiagnosticsBypassPage:', isDiagnosticsBypassPage.value)
+    if (!isDiagnosticsBypassPage.value) {
       console.log('[App.vue] Showing diagnostics panel from needsGlobalDiagnostics (initial)...')
       showGlobalDiagnostics.value = true
       fetchGlobalDiagnostics()
