@@ -2,6 +2,18 @@
 
 All notable changes to UPS Guard will be documented in this file.
 
+## [1.0.85] - 2026-11-01
+
+- Correct API paths and authentication examples in the user guides and related
+  documentation: real-time status is `GET /api/status`; WebSocket is
+  `/api/ws?token=YOUR_TOKEN`.
+- Return HTTP 404 for unregistered API GET requests instead of an error body with
+  HTTP 200, while preserving authentication and SPA page routing.
+- Add isolated regression tests for status, authentication, WebSocket and SPA routing.
+- Include the source commit in release image metadata.
+- Include existing main-branch fixes for pnpm builds, dependency downloads, serial
+  UPS configuration and manufacturer/model overrides.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -17,7 +29,7 @@ This is the first official release of UPS Guard, marking the project's transitio
 - **API Token Authentication**: Implemented Bearer Token authentication mechanism to protect all API endpoints
   - Support environment variable `API_TOKEN` for custom authentication key
   - Auto-generate random Token and display in logs if not set
-  - `/health` and `/ws` endpoints don't require authentication
+  - `/health` is public; see the current user guide for WebSocket token authentication
   - All `/api/*` routes require authentication
 - **Sensitive Information Encryption**: Use Fernet symmetric encryption to protect sensitive data
   - Support environment variable `ENCRYPTION_KEY` for custom encryption key

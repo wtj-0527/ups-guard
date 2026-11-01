@@ -562,7 +562,9 @@ UPS Guard 支持三种主题模式：
 
 ## API 参考
 
-所有 API 端点需要 Bearer Token 认证（`/health` 和 `/ws` 除外）。
+业务 HTTP API 需要 Bearer Token 认证，`GET /health` 免认证。
+WebSocket 使用 `/api/ws?token=YOUR_TOKEN`，必须通过查询参数校验 Token。
+以下 API 参考已按当前实现修正；历史版本的实际行为应以对应版本源码为准。
 
 ### 认证
 
@@ -570,14 +572,15 @@ UPS Guard 支持三种主题模式：
 # Token 在首次启动时自动生成（查看日志获取）
 # 或通过环境变量设置：API_TOKEN=your-token
 
-curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/ups
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/status
 ```
 
 ### 常用端点
 
 | 方法 | 端点 | 说明 |
 |:----:|------|------|
-| GET | `/api/ups` | 获取 UPS 当前状态 |
+| GET | `/api/status` | 获取 UPS 当前状态 |
+| GET | `/api/ups/list` | 获取 NUT UPS 设备列表 |
 | GET | `/api/config` | 获取配置 |
 | PUT | `/api/config` | 更新配置 |
 | POST | `/api/actions/shutdown` | 立即关机 |
@@ -592,22 +595,24 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/ups
 | POST | `/api/devices/{index}/wake` | WOL 唤醒设备 |
 | POST | `/api/config/test-notify` | 测试通知 |
 | GET | `/api/hooks/plugins` | 列出可用 Hook 插件 |
-| WS | `/ws` | WebSocket 实时数据推送 |
+| WS | `/api/ws?token=YOUR_TOKEN` | WebSocket 实时数据推送 |
 
 ### WebSocket 数据推送
 
-连接 `ws://HOST:PORT/ws` 后，服务端会实时推送：
+连接 `ws://HOST:PORT/api/ws?token=YOUR_TOKEN` 后，服务端会实时推送。
+HTTPS 入口应使用 `wss://`，Token 含特殊字符时需进行 URL 编码。
+状态消息示例（仅列出部分字段）：
 
 ```json
 {
-  "type": "ups_data",
+  "type": "status_update",
   "data": {
-    "status": "OL",
+    "status": "ONLINE",
     "battery_charge": 100,
     "battery_runtime": 3600,
     "input_voltage": 220.5,
     "output_voltage": 220.5,
-    "ups_load": 25,
+    "load_percent": 25,
     "battery_temperature": 30
   }
 }
@@ -693,10 +698,10 @@ ls -la /lzcapp/run/sys/lzc-apis.socket
 
 ### 认证机制
 
-- 所有 API 端点通过 **Bearer Token** 认证保护
+- 业务 HTTP API 通过 **Bearer Token** 认证保护
 - Token 可通过环境变量 `API_TOKEN` 设置
 - 未设置时系统自动生成随机 Token（首次启动查看日志获取）
-- WebSocket 和健康检查端点无需认证
+- 健康检查 `/health` 无需认证；WebSocket `/api/ws` 需要 `token` 查询参数认证
 
 ### 数据加密
 

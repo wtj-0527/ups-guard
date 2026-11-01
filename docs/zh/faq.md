@@ -46,7 +46,10 @@
     let detected = false;
     
     // 监听 WebSocket 消息
-    const ws = new WebSocket(`ws://${window.location.host}/ws?token=${localStorage.getItem('api_token')}`);
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = window.__UPS_GUARD_TOKEN__;
+    if (!token) throw new Error('未获取到 API Token，请刷新 Dashboard 后重试');
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?token=${encodeURIComponent(token)}`);
     
     ws.onopen = () => {
         console.log('✅ WebSocket 连接已建立');

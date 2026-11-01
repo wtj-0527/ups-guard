@@ -989,6 +989,11 @@ registry.register_notifier(MyNotifier)
 
 ### API List
 
+The business HTTP APIs below require the `Authorization: Bearer YOUR_TOKEN` header;
+`GET /health` is public. WebSocket connections authenticate with the `token` query
+parameter; use `wss://` for HTTPS deployments. HTTP endpoints are also listed in
+`/docs` and `/openapi.json`.
+
 #### Configuration API
 
 ```bash
@@ -1006,10 +1011,13 @@ POST /api/config/test-notify
 
 ```bash
 # Get UPS status (HTTP)
-GET /api/ups
+GET /api/status
 
 # Get UPS status (WebSocket)
-ws://localhost:8000/ws
+ws://localhost:8000/api/ws?token=YOUR_TOKEN
+
+# List UPS devices in NUT (not real-time status)
+GET /api/ups/list
 
 # Immediate shutdown
 POST /api/actions/shutdown
@@ -1017,6 +1025,11 @@ POST /api/actions/shutdown
 # Cancel shutdown
 POST /api/actions/cancel-shutdown
 ```
+
+`GET /api/ups` is not a registered status endpoint and returns HTTP 404 after
+authentication. `GET /api/status` returns HTTP 503 if the monitor is not initialized
+or UPS data is unavailable. WebSocket status messages have type `status_update`
+and carry the status in the `data` field.
 
 #### Device Management API
 

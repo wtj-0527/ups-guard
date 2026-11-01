@@ -27,7 +27,8 @@ COPY backend/pyproject.toml ./
 # 使用 uv 虚拟环境安装，减少最终镜像 COPY 体积
 RUN pip install --no-cache-dir uv && \
     uv venv /app/.venv && \
-    uv pip install --python /app/.venv/bin/python --no-cache -r pyproject.toml
+    uv pip install --python /app/.venv/bin/python --no-cache \
+        --index-url "${PIP_INDEX_URL}" -r pyproject.toml
 
 # ==================== 阶段 3: 最终镜像 ====================
 FROM python:3.11.12-alpine3.21
@@ -35,13 +36,17 @@ FROM python:3.11.12-alpine3.21
 LABEL org.opencontainers.image.title="UPS Guard" \
       org.opencontainers.image.description="懒猫微服 UPS 智能监控与管理应用" \
       org.opencontainers.image.licenses="AGPL-3.0" \
-      org.opencontainers.image.source="https://github.com/KingBoyAndGirl/ups-guard"
+      org.opencontainers.image.source="https://github.com/wtj-0527/ups-guard"
 
 ARG APP_VERSION=0.0.0
-LABEL org.opencontainers.image.version="${APP_VERSION}"
+ARG VCS_REF=""
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 
 # 系统依赖安装（静态层，应该稳定命中缓存）
-RUN apk add --no-cache \
+ARG APK_MIRROR=https://dl-cdn.alpinelinux.org/alpine
+RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR}|g" /etc/apk/repositories && \
+    apk add --no-cache \
         nut usbutils libusb-dev eudev \
         curl bash dos2unix procps && \
     mkdir -p /data /run/nut /etc/nut /var/state/ups /tmp/ups-info && \

@@ -400,15 +400,17 @@ docker logs ups-guard-frontend
 curl http://localhost:8000/health
 
 # Check NUT connection
-curl http://localhost:8000/api/ups/list
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/ups/list
 ```
 
 ### WebSocket Test
 
 ```bash
 # Using websocat
-websocat ws://localhost:8000/api/ws
+websocat 'ws://localhost:8000/api/ws?token=YOUR_TOKEN'
 ```
+
+Use `wss://` for HTTPS deployments and URL-encode tokens containing special characters.
 
 ## Deployment Architecture
 

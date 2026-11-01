@@ -1251,6 +1251,10 @@ registry.register_notifier(MyNotifier)
 
 ### API 列表
 
+以下业务 HTTP API 需要请求头 `Authorization: Bearer YOUR_TOKEN`；`GET /health` 免认证。
+WebSocket 使用查询参数 `token` 认证，HTTPS 入口应使用 `wss://`。
+HTTP 接口也可在 `/docs` 或 `/openapi.json` 中查看。
+
 #### 配置 API
 
 ```bash
@@ -1268,10 +1272,13 @@ POST /api/config/test-notify
 
 ```bash
 # 获取 UPS 状态（HTTP）
-GET /api/ups
+GET /api/status
 
 # 获取 UPS 状态（WebSocket）
-ws://localhost:8000/ws
+ws://localhost:8000/api/ws?token=YOUR_TOKEN
+
+# 列出 NUT 中的 UPS 设备（不是实时状态）
+GET /api/ups/list
 
 # 立即关机
 POST /api/actions/shutdown
@@ -1279,6 +1286,10 @@ POST /api/actions/shutdown
 # 取消关机
 POST /api/actions/cancel-shutdown
 ```
+
+`GET /api/ups` 不是已注册的状态接口，认证通过后返回 HTTP 404。
+`GET /api/status` 在监控尚未初始化或 UPS 数据暂不可用时返回 HTTP 503。
+WebSocket 状态消息类型为 `status_update`，状态数据位于 `data` 字段中。
 
 #### UPS 控制 API
 

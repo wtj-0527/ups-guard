@@ -1,0 +1,18 @@
+# Patch releases may reuse this verified runtime only while dependency manifests
+# are unchanged from v1.0.84. Build frontend/dist before creating the context.
+FROM registry.cn-shanghai.aliyuncs.com/wtjking/ups-guard@sha256:921273ae31880bac42852a45128f39071fb0a6f5db8f5bcdf077f8faeb690af5
+
+ARG APP_VERSION
+ARG VCS_REF
+ENV APP_VERSION=${APP_VERSION}
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/wtj-0527/ups-guard"
+
+COPY nut/ /app/nut/
+COPY deploy/lazycat/entrypoint.sh /entrypoint.sh
+COPY backend/src/ /app/backend/src/
+COPY backend/tools/ /app/backend/tools/
+COPY frontend/dist/ /app/frontend/dist/
+RUN chmod +x /entrypoint.sh /app/nut/entrypoint.sh && \
+    dos2unix /entrypoint.sh /app/nut/entrypoint.sh

@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -316,12 +316,12 @@ async def health():
 
 
 # SPA 路由处理 - 所有非 API 路由返回 index.html
-@app.get("/{full_path:path}")
+@app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(request: Request, full_path: str):
     """处理 SPA 路由，返回 index.html"""
     # 跳过 API 路由
-    if full_path.startswith("api/"):
-        return {"error": "Not found"}
+    if full_path == "api" or full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not Found")
 
     if STATIC_DIR:
         # 尝试返回静态文件
